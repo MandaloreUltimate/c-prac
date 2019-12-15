@@ -1,0 +1,63 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
+void
+proc(int rfd, int wfd, int maxval, int proc_id)
+{
+    while (1) {
+        int num;
+        ssize_t read_bytes;
+        if ((read_bytes = read(rfd, &num, sizeof(num))) <= 0) {
+            break;
+        }
+        num++;
+        printf("%d %d\n", proc_id, num - 1);
+        fflush(stdout);
+        if (num == maxval) {
+            break;
+        }
+        write(wfd, &num, sizeof(num));
+    }
+}
+
+int
+main(int argc, char *argv[])
+{
+    int maxval;
+    sscanf(argv[1], "%d", &maxval);
+
+    if (maxval == 1) {
+        printf("Done\n");
+        return 0;
+    }
+
+    int fd[2][2];
+    pipe(fd[0]); //fd12
+    pipe(fd[1]); //fd21
+
+    for (int i = 0; i < 2; i++) {
+        if (!fork()) {
+            close(fd[0][i]);
+            close(fd[1][1 - i]);
+            proc(fd[1 - i][0], fd[i][1], maxval, i + 1);
+            _exit(1);
+        }
+
+    }
+
+    int num = 1;
+    write(fd[1][1], &num, sizeof(num));
+
+    for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 2; j++) {
+            close(fd[i][j]);
+        }
+    }
+    while (wait(NULL) > 0);
+
+    printf("Done\n");
+    return 0;
+}

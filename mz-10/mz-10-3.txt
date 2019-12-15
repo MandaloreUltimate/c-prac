@@ -1,0 +1,69 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <wait.h>
+#include <linux/limits.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+enum { MODE = 0666 };
+
+int
+main(int argc, char *argv[])
+{
+    int fd[2];
+    pipe(fd);
+
+    if (!fork()) {
+        dup2(fd[1], STDOUT_FILENO);
+
+        close(fd[0]);
+        close(fd[1]);
+
+        if (!fork()) {
+            int file1_fd = open(argv[4], O_RDONLY);
+            if (file1_fd < 0) {
+                _exit(1);
+            }
+            dup2(file1_fd, STDIN_FILENO);
+            close(file1_fd);
+
+            execlp(argv[1], argv[1], NULL);
+            _exit(1);
+        }
+
+        int status;
+        wait(&status);
+        if (WIFEXITED(status) && !WEXITSTATUS(status)) {
+            if (!fork()) {
+                execlp(argv[2], argv[2], NULL);
+                _exit(1);
+            } else {
+                wait(NULL);
+            }
+        }
+        exit(0);
+    }
+
+    if (!fork()) {
+        int file2_fd = open(argv[5], O_CREAT | O_WRONLY | O_APPEND, MODE);
+        if (file2_fd < 0) {
+            return 1;
+        }
+        dup2(fd[0], STDIN_FILENO);
+        dup2(file2_fd, STDOUT_FILENO);
+        close(fd[0]);
+        close(fd[1]);
+        execlp(argv[3], argv[3], NULL);
+            _exit(1);
+    }
+    close(fd[1]);
+    close(fd[0]);
+
+    wait(NULL);
+    wait(NULL);
+
+    return 0;
+}

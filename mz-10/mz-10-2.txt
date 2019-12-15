@@ -1,0 +1,40 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <unistd.h>
+#include <wait.h>
+
+int
+main(void)
+{
+    int fd[2];
+    pipe(fd);
+    int status;
+    if(!fork()) {
+        close(fd[1]);
+        if(!fork()) {
+            int cur;
+            long long sum = 0;
+            while (read(fd[0], &cur, sizeof(cur))) {
+                sum += cur;
+            }
+            printf("%lld\n", sum);
+            fflush(stdout);
+            close(fd[0]);
+            exit(0);
+        } else {
+            close(fd[0]);
+            wait(&status);
+            exit(0);
+        }
+    } else {
+        close(fd[0]);
+        int num;
+        while (scanf("%d", &num) != EOF) {
+            write(fd[1], &num, sizeof(num));
+        }
+        close(fd[1]);
+        wait(&status);
+    }
+    return 0;
+}
